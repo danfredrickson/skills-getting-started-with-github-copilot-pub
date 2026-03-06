@@ -20,11 +20,32 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const spotsLeft = details.max_participants - details.participants.length;
 
+        // Create participants list HTML
+        let participantsHTML = "";
+        if (details.participants && details.participants.length > 0) {
+          participantsHTML = `
+            <div class="participants-section">
+              <strong>Participants:</strong>
+              <ul class="participants-list">
+                ${details.participants.map(email => `
+                  <li style=\"list-style:none;display:flex;align-items:center;\">
+                    <span class=\"participant-email\">${email}</span>
+                    <button class=\"delete-participant-btn\" title=\"Remove\" data-activity=\"${name}\" data-email=\"${email}\">\u274C</button>
+                  </li>
+                `).join("")}
+              </ul>
+            </div>
+          `;
+        } else {
+          participantsHTML = `<div class="participants-section"><em>No participants yet.</em></div>`;
+        }
+
         activityCard.innerHTML = `
           <h4>${name}</h4>
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          ${participantsHTML}
         `;
 
         activitiesList.appendChild(activityCard);
@@ -62,6 +83,7 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+        fetchActivities(); // Refresh activity list to show new participant
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
@@ -83,4 +105,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Initialize app
   fetchActivities();
+
+  // Delegate click event for delete buttons (only once)
+  activitiesList.addEventListener("click", async (event) => {
+    if (event.target.classList.contains("delete-participant-btn")) {
+      const activity = event.target.getAttribute("data-activity");
+      const email = event.target.getAttribute("data-email");
+      if (!activity || !email) return;
+      if (!confirm(`Remove ${email} from ${activity}?`)) return;
+      try {
+        const response = await fetch(`/activities/${encodeURIComponent(activity)}/unregister?email=${encodeURIComponent(email)}`, {
+          method: "POST",
+        });
+        if (response.ok) {
+          fetchActivities(); // Refresh list
+        } else {
+          const result = await response.json();
+          alert(result.detail || "Failed to remove participant.");
+        }
+      } catch (error) {
+        alert("Error removing participant.");
+      }
+    }
+  });
 });
